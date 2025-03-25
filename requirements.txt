@@ -1,0 +1,29 @@
+# LangChain
+langchain
+
+# Vector Database
+chromadb
+
+# Data processing and analysis
+pandas
+numpy
+
+# PDF Processing
+PyMuPDF
+
+# Token counting and encoding
+tiktoken
+
+# Embeddings (if not using Llama's built-in embeddings)
+sentence-transformers
+
+# Utilities
+tqdm
+python-dotenv
+
+# Jupyter (for the notebook in the RAG directory)
+jupyter
+ipykernel
+
+# Testing
+pytest

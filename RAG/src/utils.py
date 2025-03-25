@@ -8,7 +8,7 @@ from retriever import DocumentRetriever
 from llm_interaction import LocalLLM
 
 # --- Data Preparation ---
-file_path = "../data/your_medical_manuals.pdf"  # Assuming you have a 'data' folder
+file_path = "/Users/sunnyluffy/Documents/your_med_manual.pdf"  # Assuming you have a 'data' folder
 
 # Load Data
 data_loader = DataLoader(file_path)
@@ -33,7 +33,9 @@ llm = LocalLLM()
 questions = [
     "What is the protocol for managing sepsis in a critical care unit?",
     "What are the common symptoms of appendicitis, and can it be cured via medicine? If not, what surgical procedure should be followed to treat it?",
-    # ... other questions
+    "What are the effective treatments or solutions for addressing sudden patchy hair loss, commonly seen as localized bald spots on the scalp, and what could be the possible causes behind it?",
+    "What treatments are recommended for a person who has sustained a physical injury to brain tissue, resulting in temporary or permanent impairment of brain function?",
+    "What are the necessary precautions and treatment steps for a person who has fractured their leg during a hiking trip, and what should be considered for their care and recovery?",
 ]
 
 print("Answers using RAG:")
