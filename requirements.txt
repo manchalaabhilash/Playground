@@ -7,6 +7,17 @@ chromadb
 # Data processing and analysis
 pandas
 numpy
+seaborn
+matplotlib
+scikit-learn
+flask  
+gunicorn
+streamlit
+huggingface_hub
+xgboost
+joblib
+requests
+
 
 # PDF Processing
 PyMuPDF
