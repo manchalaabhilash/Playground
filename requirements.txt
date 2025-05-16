@@ -17,7 +17,7 @@ huggingface_hub
 xgboost
 joblib
 requests
-
+flask-cors
 
 # PDF Processing
 PyMuPDF
