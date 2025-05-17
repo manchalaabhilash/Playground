@@ -8,38 +8,41 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  rag-api:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
     volumes:
-      - ./data/pdfs:/app/data/pdfs
-      - ./data/vector_db:/app/data/vector_db
-    depends_on:
-      - ollama
+      - ./data:/app/data
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - API_HOST=0.0.0.0
-      - API_PORT=5000
-      - DEBUG_MODE=False
-      - PDF_DIRECTORY=data/pdfs
-      - VECTOR_DB_PATH=data/vector_db
+      - DEPLOYMENT_ENV=production
+    depends_on:
+      ollama:
+        condition: service_healthy
     restart: unless-stopped
 
-  rag-ui:
+  ui:
     build:
       context: .
       dockerfile: Dockerfile.ui
     ports:
       - "8501:8501"
-    depends_on:
-      - rag-api
+    volumes:
+      - ./data:/app/data
     environment:
-      - API_HOST=rag-api
-      - API_PORT=5000
+      - API_HOST=http://api:5000
+      - DEPLOYMENT_ENV=production
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:

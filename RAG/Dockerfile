@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p data/pdfs data/vector_db
+RUN mkdir -p data/pdfs data/vector_db && \
+    chmod -R 777 data
 
 # Expose port
 EXPOSE 5000

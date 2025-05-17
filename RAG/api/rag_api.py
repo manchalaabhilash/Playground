@@ -2,12 +2,14 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sys
 import os
+import time
 sys.path.append('.')
 
 from src.data_processing import DataLoader, DataSplitter
 from src.embedding import EmbeddingModel
 from src.vector_database import VectorDB
 from src.llm_interaction import LocalLLM
+from src.config import API_HOST, API_PORT, DEBUG_MODE
 
 app = Flask(__name__)
 CORS(app)
@@ -16,7 +18,7 @@ CORS(app)
 vector_db = None
 retriever = None
 llm = None
-pdf_directory = "pdfs"  # Directory to store uploaded PDFs
+pdf_directory = os.environ.get("PDF_DIRECTORY", "data/pdfs")
 
 @app.route('/')
 def home():
@@ -43,15 +45,26 @@ def initialize():
         if not valid_paths:
             return jsonify({"error": "No valid PDF paths found"}), 400
         
+        # Initialize LLM first to ensure Ollama is ready
+        llm = LocalLLM()
+        
         # Load documents
         documents = []
         for pdf_path in valid_paths:
             loader = DataLoader(pdf_path)
-            documents.extend(loader.load_data())
+            doc_chunks = loader.load_data()
+            if doc_chunks:
+                documents.extend(doc_chunks)
+        
+        if not documents:
+            return jsonify({"error": "Could not extract text from PDFs"}), 400
         
         # Split documents
         splitter = DataSplitter(chunk_size=500, chunk_overlap=50)
         chunks = splitter.split_data(documents)
+        
+        if not chunks:
+            return jsonify({"error": "Could not split documents into chunks"}), 400
         
         # Create embeddings and store in vector DB
         embedding_model = EmbeddingModel()
@@ -60,9 +73,6 @@ def initialize():
         
         # Create retriever
         retriever = vector_db.get_retriever(search_kwargs={"k": 5})
-        
-        # Initialize LLM
-        llm = LocalLLM()
         
         return jsonify({
             "status": "success",
@@ -78,8 +88,9 @@ def initialize():
 def ask():
     global retriever, llm
     
-    if not retriever or not llm:
-        return jsonify({"error": "RAG system not initialized. Call /initialize first"}), 400
+    if not llm:
+        # Initialize LLM if not already done
+        llm = LocalLLM()
     
     try:
         data = request.json
@@ -88,6 +99,9 @@ def ask():
         
         if not question:
             return jsonify({"error": "No question provided"}), 400
+        
+        if use_rag and not retriever:
+            return jsonify({"error": "RAG system not initialized. Call /initialize first"}), 400
         
         if use_rag:
             # Get relevant documents
@@ -119,7 +133,22 @@ Answer:"""
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for the API"""
+    return jsonify({
+        "status": "healthy",
+        "llm_initialized": llm is not None,
+        "rag_initialized": retriever is not None
+    })
+
 if __name__ == '__main__':
     # Create PDF directory if it doesn't exist
     os.makedirs(pdf_directory, exist_ok=True)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    
+    # Wait for Ollama to be ready in container environment
+    if os.environ.get("DEPLOYMENT_ENV") == "production":
+        time.sleep(10)
+    
+    # Start the Flask app
+    app.run(debug=DEBUG_MODE, host=API_HOST, port=API_PORT)
