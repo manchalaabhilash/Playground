@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data/pdfs:/app/data/pdfs
+      - ./data/vector_db:/app/data/vector_db
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - API_HOST=0.0.0.0
+      - API_PORT=5000
+      - DEBUG_MODE=False
+      - PDF_DIRECTORY=data/pdfs
+      - VECTOR_DB_PATH=data/vector_db
+    restart: unless-stopped
+
+  rag-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8501:8501"
+    depends_on:
+      - rag-api
+    environment:
+      - API_HOST=rag-api
+      - API_PORT=5000
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

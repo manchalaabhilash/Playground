@@ -1,0 +1,48 @@
+RAG/
+├── README.md                  # Project overview
+├── requirements.txt           # All dependencies
+├── .gitignore                 # Git ignore file
+├── .env                       # Environment variables
+├── docker-compose.yml         # Docker compose for all services
+├── Dockerfile                 # API Dockerfile
+├── Dockerfile.ui              # UI Dockerfile
+├── reorganize.py              # Script to reorganize files
+
+├── src/                       # Core source code
+│   ├── __init__.py
+│   ├── data_processing.py     # Data loading and splitting
+│   ├── embedding.py           # Embedding models
+│   ├── vector_database.py     # Vector DB operations
+│   ├── retriever.py           # Document retrieval
+│   ├── llm_interaction.py     # LLM interaction
+│   ├── rag.py                 # RAG implementation
+│   └── config.py              # Configuration settings
+│
+├── api/                       # API-related code
+│   ├── __init__.py
+│   ├── rag_api.py             # Flask API
+│   └── routes/                # API routes
+│       └── __init__.py
+│
+├── ui/                        # UI-related code
+│   ├── __init__.py
+│   ├── rag_web_ui.py          # Streamlit UI
+│   └── components/            # UI components
+│       └── __init__.py
+│
+├── scripts/                   # Utility scripts
+│   ├── rag_client.py          # CLI client
+│   └── test_rag.py            # Test script
+│
+├── notebooks/                 # Jupyter notebooks
+│   └── rag_demo.ipynb         # Demo notebook
+│
+├── tests/                     # Unit tests
+│   ├── __init__.py
+│   ├── test_data_processing.py
+│   ├── test_embedding.py
+│   └── test_rag.py
+│
+└── data/                      # Data directory
+    ├── pdfs/                  # PDF storage
+    └── vector_db/             # Vector DB storage

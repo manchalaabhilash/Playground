@@ -1,0 +1,23 @@
+# Core dependencies
+langchain>=0.1.0
+chromadb>=0.4.22
+sentence-transformers>=2.2.2
+PyMuPDF>=1.23.8
+tiktoken>=0.5.2
+python-dotenv>=1.0.0
+
+# API and UI
+flask>=2.2.3
+flask-cors>=3.0.10
+streamlit>=1.32.0
+requests>=2.31.0
+
+# Utilities
+tqdm>=4.66.1
+numpy>=1.26.0
+pandas>=2.1.0
+
+# Development and testing
+pytest>=7.4.0
+jupyter>=1.0.0
+ipykernel>=6.25.0
