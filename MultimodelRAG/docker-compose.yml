@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DEPLOYMENT_ENV=production
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - API_HOST=http://api:5000
+      - DEPLOYMENT_ENV=production
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  data:

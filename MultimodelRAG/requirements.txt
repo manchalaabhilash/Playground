@@ -1,0 +1,27 @@
+# Core dependencies
+langchain>=0.0.267
+langchain-community>=0.0.1
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+sentence-transformers>=2.2.2
+chromadb>=0.4.13
+pypdf>=3.15.1
+
+# Multimodal dependencies
+pillow>=10.0.0
+pytesseract>=0.3.10
+transformers>=4.30.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# API dependencies
+flask>=2.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+
+# UI dependencies
+streamlit>=1.26.0
+
+# Utilities
+numpy>=1.24.0
+tqdm>=4.66.1
