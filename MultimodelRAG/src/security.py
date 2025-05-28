@@ -298,5 +298,244 @@ def sanitize_request(f):
         
         return f(*args, **kwargs)
     return decorated
-```
-</augment_code
+
+def validate_content_type(content_types):
+    """
+    Decorator to validate request content type.
+    
+    Args:
+        content_types: List of allowed content types
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if request.content_type not in content_types:
+                return jsonify({
+                    "error": f"Unsupported content type: {request.content_type}. "
+                             f"Supported types: {', '.join(content_types)}"
+                }), 415
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+def validate_file_upload_decorator(allowed_extensions, max_size_mb=10):
+    """
+    Decorator to validate file uploads.
+    
+    Args:
+        allowed_extensions: List of allowed file extensions
+        max_size_mb: Maximum file size in MB
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            security_manager = SecurityManager()
+            
+            if 'file' not in request.files:
+                return jsonify({"error": "No file provided"}), 400
+            
+            file = request.files['file']
+            
+            if file.filename == '':
+                return jsonify({"error": "No file selected"}), 400
+            
+            # Read file data for validation
+            file_data = file.read()
+            file.seek(0)  # Reset file pointer
+            
+            if not security_manager.validate_file_upload(
+                file_data, file.filename, allowed_extensions, max_size_mb
+            ):
+                return jsonify({
+                    "error": f"Invalid file. Allowed extensions: {', '.join(allowed_extensions)}, "
+                             f"max size: {max_size_mb}MB"
+                }), 400
+            
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+class CSRFProtection:
+    """CSRF protection for web applications"""
+    
+    @staticmethod
+    def generate_csrf_token() -> str:
+        """
+        Generate a CSRF token.
+        
+        Returns:
+            CSRF token
+        """
+        if 'csrf_token' not in g:
+            g.csrf_token = secrets.token_hex(16)
+        
+        return g.csrf_token
+    
+    @staticmethod
+    def validate_csrf_token(token: str) -> bool:
+        """
+        Validate a CSRF token.
+        
+        Args:
+            token: CSRF token to validate
+        
+        Returns:
+            True if token is valid, False otherwise
+        """
+        if not token or not hasattr(g, 'csrf_token'):
+            return False
+        
+        return hmac.compare_digest(token, g.csrf_token)
+    
+    @staticmethod
+    def csrf_protect(f):
+        """Decorator to require CSRF token for POST/PUT/DELETE requests"""
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if request.method in ['POST', 'PUT', 'DELETE']:
+                token = request.form.get('csrf_token') or request.headers.get('X-CSRF-Token')
+                
+                if not CSRFProtection.validate_csrf_token(token):
+                    return jsonify({"error": "CSRF token missing or invalid"}), 403
+            
+            return f(*args, **kwargs)
+        return decorated
+
+class ContentSecurityPolicy:
+    """Content Security Policy (CSP) management"""
+    
+    def __init__(self):
+        """Initialize CSP with default policies"""
+        self.policies = {
+            'default-src': ["'self'"],
+            'script-src': ["'self'"],
+            'style-src': ["'self'"],
+            'img-src': ["'self'", "data:"],
+            'connect-src': ["'self'"],
+            'font-src': ["'self'"],
+            'object-src': ["'none'"],
+            'media-src': ["'self'"],
+            'frame-src': ["'none'"]
+        }
+    
+    def add_source(self, directive: str, source: str) -> None:
+        """
+        Add a source to a CSP directive.
+        
+        Args:
+            directive: CSP directive
+            source: Source to add
+        """
+        if directive in self.policies:
+            if source not in self.policies[directive]:
+                self.policies[directive].append(source)
+        else:
+            self.policies[directive] = [source]
+    
+    def get_header_value(self) -> str:
+        """
+        Get CSP header value.
+        
+        Returns:
+            CSP header value
+        """
+        directives = []
+        
+        for directive, sources in self.policies.items():
+            directives.append(f"{directive} {' '.join(sources)}")
+        
+        return "; ".join(directives)
+
+class SecureHeaders:
+    """Security headers management"""
+    
+    @staticmethod
+    def apply_secure_headers(response):
+        """
+        Apply security headers to response.
+        
+        Args:
+            response: Flask response object
+        
+        Returns:
+            Response with security headers
+        """
+        # Content Security Policy
+        csp = ContentSecurityPolicy()
+        response.headers['Content-Security-Policy'] = csp.get_header_value()
+        
+        # Other security headers
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        
+        return response
+
+class PasswordManager:
+    """Password hashing and validation"""
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """
+        Hash a password.
+        
+        Args:
+            password: Password to hash
+        
+        Returns:
+            Hashed password
+        """
+        # Generate a random salt
+        salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
+        
+        # Hash password with salt
+        pwdhash = hashlib.pbkdf2_hmac(
+            'sha512', 
+            password.encode('utf-8'), 
+            salt, 
+            100000,
+            dklen=128
+        )
+        
+        # Encode for storage
+        pwdhash = base64.b64encode(pwdhash).decode('ascii')
+        
+        # Return salt and hash
+        return f"{salt.decode('ascii')}${pwdhash}"
+    
+    @staticmethod
+    def verify_password(stored_password: str, provided_password: str) -> bool:
+        """
+        Verify a password against its hash.
+        
+        Args:
+            stored_password: Stored password hash
+            provided_password: Password to verify
+        
+        Returns:
+            True if password matches, False otherwise
+        """
+        # Split salt and hash
+        salt, stored_hash = stored_password.split('$')
+        
+        # Hash provided password with same salt
+        pwdhash = hashlib.pbkdf2_hmac(
+            'sha512', 
+            provided_password.encode('utf-8'), 
+            salt.encode('ascii'), 
+            100000,
+            dklen=128
+        )
+        
+        # Encode for comparison
+        pwdhash = base64.b64encode(pwdhash).decode('ascii')
+        
+        # Compare hashes using constant-time comparison
+        return hmac.compare_digest(pwdhash, stored_hash)
+
+# Initialize security components
+security_manager = SecurityManager()
+csrf_protection = CSRFProtection()

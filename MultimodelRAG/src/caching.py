@@ -375,4 +375,230 @@ def cache_result(cache_name: str = "default", key_fn: Optional[Callable] = None,
             if result is not None:
                 return result
             
-            # Call function and
+            # Call function and cache result
+            result = func(*args, **kwargs)
+            cache.set(key, result)
+            return result
+        
+        return wrapper
+    
+    return decorator
+
+def cache_embedding(cache_name: str = "embeddings", ttl_seconds: int = 86400, 
+                   cache_type: str = "disk"):
+    """
+    Decorator specifically for caching embeddings.
+    
+    Args:
+        cache_name: Name of cache to use
+        ttl_seconds: Time-to-live in seconds
+        cache_type: Type of cache ("memory" or "disk")
+    
+    Returns:
+        Decorated function with embedding caching
+    """
+    def key_generator(text, *args, **kwargs):
+        # Generate a stable hash for the text
+        return f"emb:{hashlib.md5(text.encode()).hexdigest()}"
+    
+    return cache_result(
+        cache_name=cache_name,
+        key_fn=key_generator,
+        ttl_seconds=ttl_seconds,
+        cache_type=cache_type
+    )
+
+def cache_llm_response(cache_name: str = "llm_responses", ttl_seconds: int = 3600, 
+                      cache_type: str = "disk"):
+    """
+    Decorator specifically for caching LLM responses.
+    
+    Args:
+        cache_name: Name of cache to use
+        ttl_seconds: Time-to-live in seconds
+        cache_type: Type of cache ("memory" or "disk")
+    
+    Returns:
+        Decorated function with LLM response caching
+    """
+    def key_generator(prompt, *args, **kwargs):
+        # Generate a stable hash for the prompt
+        model = kwargs.get('model', 'default')
+        temperature = kwargs.get('temperature', 0.0)
+        return f"llm:{model}:{temperature}:{hashlib.md5(prompt.encode()).hexdigest()}"
+    
+    return cache_result(
+        cache_name=cache_name,
+        key_fn=key_generator,
+        ttl_seconds=ttl_seconds,
+        cache_type=cache_type
+    )
+
+def cache_image_embedding(cache_name: str = "image_embeddings", ttl_seconds: int = 86400, 
+                         cache_type: str = "disk"):
+    """
+    Decorator specifically for caching image embeddings.
+    
+    Args:
+        cache_name: Name of cache to use
+        ttl_seconds: Time-to-live in seconds
+        cache_type: Type of cache ("memory" or "disk")
+    
+    Returns:
+        Decorated function with image embedding caching
+    """
+    def key_generator(image_path, *args, **kwargs):
+        # Generate a stable hash based on image path and modification time
+        if not os.path.exists(image_path):
+            return f"img_emb:{hashlib.md5(image_path.encode()).hexdigest()}"
+        
+        mtime = os.path.getmtime(image_path)
+        size = os.path.getsize(image_path)
+        return f"img_emb:{hashlib.md5(f'{image_path}:{mtime}:{size}'.encode()).hexdigest()}"
+    
+    return cache_result(
+        cache_name=cache_name,
+        key_fn=key_generator,
+        ttl_seconds=ttl_seconds,
+        cache_type=cache_type
+    )
+
+class BatchCache:
+    """Cache for batch operations"""
+    
+    def __init__(self, cache_name: str = "batch_cache", cache_type: str = "memory", 
+                ttl_seconds: int = 3600):
+        """
+        Initialize the batch cache.
+        
+        Args:
+            cache_name: Cache name
+            cache_type: Type of cache ("memory" or "disk")
+            ttl_seconds: Time-to-live in seconds
+        """
+        self.cache_manager = CacheManager()
+        self.cache = self.cache_manager.get_cache(
+            cache_name, 
+            cache_type=cache_type, 
+            ttl_seconds=ttl_seconds
+        )
+    
+    def get_batch(self, keys: List[str]) -> Dict[str, Any]:
+        """
+        Get multiple items from cache.
+        
+        Args:
+            keys: List of cache keys
+        
+        Returns:
+            Dictionary mapping keys to cached values
+        """
+        result = {}
+        for key in keys:
+            value = self.cache.get(key)
+            if value is not None:
+                result[key] = value
+        
+        return result
+    
+    def set_batch(self, items: Dict[str, Any]) -> None:
+        """
+        Set multiple items in cache.
+        
+        Args:
+            items: Dictionary mapping keys to values
+        """
+        for key, value in items.items():
+            self.cache.set(key, value)
+
+class TimedCache:
+    """Cache with automatic expiration based on time"""
+    
+    def __init__(self, name: str, expiration_strategy: str = "sliding", 
+                default_ttl: int = 3600):
+        """
+        Initialize the timed cache.
+        
+        Args:
+            name: Cache name
+            expiration_strategy: Strategy for expiration ("sliding" or "fixed")
+            default_ttl: Default time-to-live in seconds
+        """
+        self.name = name
+        self.expiration_strategy = expiration_strategy
+        self.default_ttl = default_ttl
+        self.cache = {}
+        self.expiration_times = {}
+        self.lock = threading.RLock()
+        
+        # Start cleanup thread
+        self.cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self.cleanup_thread.start()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """
+        Get item from cache.
+        
+        Args:
+            key: Cache key
+        
+        Returns:
+            Cached item or None if not found or expired
+        """
+        with self.lock:
+            if key in self.cache and key in self.expiration_times:
+                # Check if item has expired
+                if datetime.now() < self.expiration_times[key]:
+                    # Update expiration time for sliding strategy
+                    if self.expiration_strategy == "sliding":
+                        self.expiration_times[key] = datetime.now() + timedelta(seconds=self.default_ttl)
+                    
+                    return self.cache[key]
+                else:
+                    # Remove expired item
+                    del self.cache[key]
+                    del self.expiration_times[key]
+            
+            return None
+    
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+        """
+        Set item in cache with expiration.
+        
+        Args:
+            key: Cache key
+            value: Value to cache
+            ttl: Time-to-live in seconds (overrides default)
+        """
+        with self.lock:
+            # Set expiration time
+            ttl_seconds = ttl if ttl is not None else self.default_ttl
+            expiration_time = datetime.now() + timedelta(seconds=ttl_seconds)
+            
+            # Store item and expiration time
+            self.cache[key] = value
+            self.expiration_times[key] = expiration_time
+    
+    def _cleanup_loop(self) -> None:
+        """Background thread to clean up expired items"""
+        while True:
+            self._cleanup_expired()
+            time.sleep(60)  # Check every minute
+    
+    def _cleanup_expired(self) -> None:
+        """Remove expired items from cache"""
+        with self.lock:
+            now = datetime.now()
+            expired_keys = [
+                key for key, expiration in self.expiration_times.items()
+                if now >= expiration
+            ]
+            
+            for key in expired_keys:
+                if key in self.cache:
+                    del self.cache[key]
+                if key in self.expiration_times:
+                    del self.expiration_times[key]
+
+# Initialize cache manager
+cache_manager = CacheManager()
