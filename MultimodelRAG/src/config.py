@@ -37,3 +37,22 @@ MCP_SERVER_INFO = {
     "name": os.environ.get("MCP_SERVER_NAME", "multimodal-rag-server"),
     "version": os.environ.get("MCP_SERVER_VERSION", "1.0.0")
 }
+
+class RagConfig:
+    def __init__(self, config_path=None):
+        # Default configuration
+        self.chunk_size = 1000
+        self.chunk_overlap = 200
+        self.embedding_model = "text-embedding-ada-002"
+        self.llm_model = "claude-3-sonnet"
+        self.fusion_strategy = "linear"
+        self.text_weight = 0.7
+        self.image_weight = 0.3
+        
+        # Load from file if provided
+        if config_path:
+            self.load_from_file(config_path)
+    
+    def load_from_file(self, config_path):
+        # Load configuration from YAML/JSON file
+        pass

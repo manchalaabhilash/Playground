@@ -1,17 +1,27 @@
-version: '3'
+version: '3.8'
 
 services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.api
     ports:
       - "5000:5000"
+      - "9090:9090"  # Prometheus metrics
     volumes:
       - ./data:/app/data
     environment:
-      - DEPLOYMENT_ENV=production
+      - VECTOR_DB_PATH=/app/data/vector_db
+      - DOCUMENT_PATH=/app/data/documents
+      - IMAGE_PATH=/app/data/images
+      - PROMETHEUS_ENABLED=true
+      - PROMETHEUS_PORT=9090
+      - MODEL_CACHE_SIZE=3
+      - MODEL_CACHE_TTL=3600
     restart: unless-stopped
+    networks:
+      - multimodal-rag
+      - monitoring
 
   ui:
     build:
@@ -22,11 +32,43 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - API_HOST=http://api:5000
-      - DEPLOYMENT_ENV=production
+      - API_URL=http://api:5000
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      - multimodal-rag
 
-volumes:
-  data:
+  model-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.model-api
+    ports:
+      - "5001:5001"
+      - "9091:9090"  # Prometheus metrics
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - MODEL_PATH=/app/models
+      - PROMETHEUS_ENABLED=true
+      - PROMETHEUS_PORT=9090
+      - MODEL_CACHE_SIZE=2
+      - MODEL_CACHE_TTL=1800
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - multimodal-rag
+      - monitoring
+
+networks:
+  multimodal-rag:
+    driver: bridge
+  monitoring:
+    external: true

@@ -51,6 +51,15 @@ class MultimodalLLM:
         
         return response
     
+    def generate_response_stream(self, question, relevant_texts=None, relevant_images=None):
+        """Generate a streaming response using the multimodal LLM"""
+        prompt = self._prepare_prompt(question, relevant_texts, relevant_images)
+        
+        if "claude" in self.model_name.lower():
+            return self._stream_anthropic_api(prompt, relevant_images)
+        else:
+            return self._stream_openai_api(prompt, relevant_images)
+    
     def _prepare_prompt(self, question: str, relevant_texts: List[Any] = None, relevant_images: List[Any] = None) -> str:
         """Prepare the prompt with context"""
         prompt = "You are a helpful assistant that can understand both text and images.\n\n"

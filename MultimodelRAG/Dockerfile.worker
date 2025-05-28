@@ -1,0 +1,33 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir celery redis
+
+# Copy the rest of the application
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p data/models data/optimized_models && \
+    chmod -R 777 data
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV CELERY_BROKER_URL=redis://redis:6379/0
+ENV CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+# Start Celery worker
+CMD ["celery", "-A", "src.background_tasks", "worker", "--loglevel=info"]

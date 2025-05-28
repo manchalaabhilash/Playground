@@ -4,10 +4,13 @@ import numpy as np
 from src.config import VECTOR_DB_PATH
 
 class MultimodalVectorDB:
-    def __init__(self, text_embedding_function, image_embedding_function, persist_directory=None):
+    def __init__(self, text_embedding_function, image_embedding_function, persist_directory=None, cache_enabled=True):
         self.text_embedding_function = text_embedding_function
         self.image_embedding_function = image_embedding_function
         self.persist_directory = persist_directory or VECTOR_DB_PATH
+        self.cache_enabled = cache_enabled
+        self.query_cache = {}
+        self.cache_ttl = 3600  # 1 hour
         
         # Create separate collections for text and images
         self.text_db_path = os.path.join(self.persist_directory, "text")
@@ -95,3 +98,18 @@ class MultimodalVectorDB:
             search_type=search_type,
             search_kwargs=search_kwargs
         )
+    
+    def get_similar_documents(self, query_vector, collection_name, k=5):
+        # Check cache first
+        cache_key = f"{hash(str(query_vector))}-{collection_name}-{k}"
+        if self.cache_enabled and cache_key in self.query_cache:
+            return self.query_cache[cache_key]
+            
+        # Perform actual retrieval
+        results = self._perform_vector_search(query_vector, collection_name, k)
+        
+        # Cache results
+        if self.cache_enabled:
+            self.query_cache[cache_key] = results
+            
+        return results

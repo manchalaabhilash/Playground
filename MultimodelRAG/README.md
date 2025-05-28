@@ -47,3 +47,29 @@ MultimodelRAG/
 2. Initialize the multimodal RAG system
 3. Ask questions about your content
 4. Get answers with relevant text and image context
+
+## Monitoring
+
+The system includes comprehensive monitoring using Prometheus and Grafana:
+
+### Setup Monitoring
+
+```bash
+# Start the monitoring stack
+docker-compose -f docker-compose.monitoring.yml up -d
+
+# Start the application with monitoring enabled
+docker-compose up -d
+```
+
+### Access Dashboards
+
+- Grafana: http://localhost:3000 (admin/admin)
+- Prometheus: http://localhost:9090
+
+### Available Dashboards
+
+- Model Performance Dashboard: Metrics related to model performance
+- System Performance Dashboard: Metrics related to system performance
+
+For more details, see [Monitoring Guide](docs/monitoring.md).
